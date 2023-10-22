@@ -205,20 +205,20 @@ const addRibbon = () => {
   const frontMaterial = new THREE.MeshStandardMaterial({
     map: frontTexture,
     side: THREE.BackSide,
-    // alphaTest: .5,
+    alphaTest: .5,
     // flatShading: true,
-    alphaMap: backTexture,
+    // alphaMap: backTexture,
     wireframe: false,
     metalness: params.metalness,
     roughness: params.roughness,
-    transparent: false,
+    // transparent: false,
   })
 
   const backMaterial = new THREE.MeshStandardMaterial({
     map: backTexture,
     side: THREE.FrontSide,
     alphaTest: .5,
-    alphaMap: frontTexture,
+    // alphaMap: frontTexture,
     // flatShading: true,
     wireframe: false,
     metalness: params.metalness,
