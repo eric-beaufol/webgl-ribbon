@@ -134,11 +134,11 @@ const tick = () => {
 
 const lights = []
 const addLights = () => {
-  const ambientLight = new THREE.AmbientLight(0xffffff, .7)
+  const ambientLight = new THREE.AmbientLight(0xffffff, .6)
   scene.add(ambientLight)
 
   const lightShadowMapSize = 3
-  const directionalLight = new THREE.DirectionalLight(0xffffff, .3)
+  const directionalLight = new THREE.DirectionalLight(0xffffff, .7)
   directionalLight.position.set(1, 2, 4)
   directionalLight.castShadow = true
   directionalLight.shadow.mapSize.width = 2048
@@ -315,7 +315,9 @@ const addPlane = () => {
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(10, 10),
     new THREE.MeshStandardMaterial({
-      color: 0xd7fdd2,
+      // color: 0xd7fdd2,
+      color: 0xffffff,
+      // emissive: 0xffffff,
       wireframe: false,
       side: THREE.DoubleSide
     })
@@ -381,8 +383,8 @@ const addEvents = () => {
 addEvents()
 addRibbon()
 addPlane()
-addSmallPlane()
-addBox()
+// addSmallPlane()
+// addBox()
 addLights()
 addGUI()
 // addHelper()
