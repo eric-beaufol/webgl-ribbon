@@ -66,6 +66,7 @@ const renderer = new THREE.WebGLRenderer({
 })
 renderer.setClearColor(0xffffff, 1)
 renderer.shadowMap.enabled = true
+renderer.shadowMap.type = THREE.PCFShadowMap
 renderer.shadowMap.type = THREE.VSMShadowMap
 renderer.setSize(sizes.width, sizes.height)
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -102,11 +103,26 @@ const tick = () => {
   // Update controls
   controls.update(elapsedTime)
 
+  // Ribbon
   ribbon.material.forEach((material, index) => {
     material.map.offset.x += deltaTime * 0.05 * (index ? -1 : 1)
+
+    // Offset alphaMap justonce because the same texture is used by the two materials
+    if (!index) {
+      material.alphaMap.offset.x += deltaTime * 0.05
+    }
     material.roughness = params.roughness
     material.metalness = params.metalness
+
+    material.needsUpdate = true
   })
+
+  // Lights
+  // lights.forEach(light => {
+  //   light.position.x += Math.cos(elapsedTime) * 0.02
+  //   light.position.z += Math.sin(elapsedTime) * 0.02
+  //   light.lookAt(scene.position)
+  // })
 
   renderer.render(scene, camera)
 
@@ -116,18 +132,19 @@ const tick = () => {
   window.requestAnimationFrame(tick)
 }
 
+const lights = []
 const addLights = () => {
   const ambientLight = new THREE.AmbientLight(0xffffff, .7)
   scene.add(ambientLight)
 
-  const lightShadowMapSize = 1
-  const directionalLight = new THREE.DirectionalLight(0xffffff, .65)
+  const lightShadowMapSize = 3
+  const directionalLight = new THREE.DirectionalLight(0xffffff, .3)
   directionalLight.position.set(1, 2, 4)
   directionalLight.castShadow = true
   directionalLight.shadow.mapSize.width = 2048
   directionalLight.shadow.mapSize.height = 2048
   directionalLight.shadow.camera.near = 0.1
-  directionalLight.shadow.camera.far = 10
+  directionalLight.shadow.camera.far = 15
   directionalLight.shadow.camera.top = lightShadowMapSize
   directionalLight.shadow.camera.bottom = -lightShadowMapSize
   directionalLight.shadow.camera.left = -lightShadowMapSize
@@ -136,14 +153,27 @@ const addLights = () => {
 
   scene.add(directionalLight)
 
+  const directionalLight1 = directionalLight.clone()
+  directionalLight1.intensity = 0.2
+  directionalLight1.position.x = -2
+  scene.add(directionalLight1)
+
   const lightHelper = new THREE.DirectionalLightHelper(directionalLight, 1, 0x00ff00)
   // scene.add(lightHelper)
 
   const shadowHelper = new THREE.CameraHelper(directionalLight.shadow.camera)
   // scene.add(shadowHelper)
+
+  lights.push(directionalLight, directionalLight1)
 }
 
-let ribbon
+const addHelper = () => {
+  scene.add(
+    new THREE.GridHelper()
+  )
+}
+
+let ribbon, curveObject
 const addRibbon = () => {
   const sphere = new THREE.Mesh(
     new THREE.SphereGeometry(1, 30, 30),
@@ -176,8 +206,8 @@ const addRibbon = () => {
   const material = new THREE.LineBasicMaterial({ color: 0xff0000 })
 
   // Create the final object to add to the scene
-  const curveObject = new THREE.Line(geometry, material)
-  scene.add(curveObject)
+  curveObject = new THREE.Line(geometry, material)
+  // scene.add(curveObject)
 
   const number = 1000
   const frenetFrames = curve.computeFrenetFrames(number, true)
@@ -201,29 +231,37 @@ const addRibbon = () => {
     
     texture.offset.setX(0.5)
   })
+
+  const alphamapTexture = new THREE.TextureLoader().load('/ribbon-alphamap.png')
+  alphamapTexture.wrapS = 1000
+  alphamapTexture.wrapT = 1000
+  alphamapTexture.repeat.set(1, 1)
+  alphamapTexture.offset.setX(0.5)
   
   const frontMaterial = new THREE.MeshStandardMaterial({
     map: frontTexture,
+    // color: 'red',
     side: THREE.BackSide,
     alphaTest: .5,
     // flatShading: true,
-    // alphaMap: backTexture,
+    alphaMap: alphamapTexture,
     wireframe: false,
     metalness: params.metalness,
     roughness: params.roughness,
-    // transparent: false,
+    transparent: true
   })
 
   const backMaterial = new THREE.MeshStandardMaterial({
     map: backTexture,
+    // color: 'black',
     side: THREE.FrontSide,
     alphaTest: .5,
-    // alphaMap: frontTexture,
+    alphaMap: alphamapTexture,
     // flatShading: true,
     wireframe: false,
     metalness: params.metalness,
     roughness: params.roughness,
-    // transparent: false,
+    transparent: true
   })
 
   const ribbonMaterials = [frontMaterial, backMaterial]
@@ -258,8 +296,6 @@ const addRibbon = () => {
   ribbon.castShadow = true
   ribbon.receiveShadow = true
 
-  console.log(ribbon)
-
   // ribbon.rotation.set(
   //   Math.random() * Math.PI * 2,
   //   Math.random() * Math.PI * 2,
@@ -273,14 +309,13 @@ const addRibbon = () => {
     scene.remove(curveObject)
     addRibbon()
   }
-
 }
 
 const addPlane = () => {
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(10, 10),
     new THREE.MeshStandardMaterial({
-      color: 0xff0000,
+      color: 0xd7fdd2,
       wireframe: false,
       side: THREE.DoubleSide
     })
@@ -293,13 +328,47 @@ const addPlane = () => {
   scene.add(mesh)
 }
 
+const addSmallPlane = () => {
+  const textureLoader = new THREE.TextureLoader()
+  const texture = textureLoader.load('/semi-opaque-texture.png')
+  texture.minFilter = texture.magFilter = THREE.NearestFilter
+
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.DoubleSide,
+      transparent: true,
+      alphaMap: textureLoader.load('/alphamap.png'),
+      alphaTest: .5
+    })
+  )
+  // mesh.receiveShadow = true
+  mesh.castShadow = true
+  mesh.position.y = -.5
+  mesh.position.x = 2 
+  scene.add(mesh)
+}
+
+const addBox = () => {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(.4, .4, .4),
+    new THREE.MeshStandardMaterial({ color: 0x00ff00 })
+  )
+  mesh.position.x = -2
+  mesh.position.y = -.5
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  scene.add(mesh)
+}
+
 let gui
 const addGUI = () => {
   gui = new dat.GUI()
 
-  gui.add(params, 'reset')
   gui.add(params, 'roughness', 0, 1, .001)
   gui.add(params, 'metalness', 0, 1, .001)
+  gui.add(params, 'reset')
 }
 
 const addEvents = () => {
@@ -311,7 +380,10 @@ const addEvents = () => {
 
 addEvents()
 addRibbon()
-// addPlane()
+addPlane()
+addSmallPlane()
+addBox()
 addLights()
 addGUI()
+// addHelper()
 tick()
